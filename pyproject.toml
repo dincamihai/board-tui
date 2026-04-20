@@ -1,0 +1,21 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "board-tui"
+version = "0.1.0"
+description = "Textual-based TUI kanban board for .tasks/*.md markdown files"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "textual>=1.0.0",
+    "mcp>=1.0.0",
+]
+
+[project.scripts]
+board-tui = "board_tui.cli:main"
+board-tui-mcp = "board_tui.mcp_entry:main"
+
+[project.optional-dependencies]
+dev = ["pytest"]
