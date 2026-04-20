@@ -4,6 +4,8 @@ Textual-based TUI kanban board for `.tasks/*.md` markdown files with YAML frontm
 
 ![demo](demo.gif)
 
+Pairs with [local-agent](https://github.com/dincamihai/local-agent) — delegate a card to a local LLM that updates it when done.
+
 ## Install
 
 ```bash
