@@ -1,8 +1,9 @@
 ---
-column: Backlog
+column: Done
 order: 10
 created: 2026-04-21
-parent:
+parent: 
+updated: true
 ---
 
 # board-tui: E2E test suite
@@ -36,3 +37,17 @@ Build comprehensive E2E test suite for board-tui TUI using Textual's testing fra
 - Tests run in CI with `pytest tests/test_e2e.py`
 - No flaky timing issues (use `pilot.pause()` correctly)
 - >90% coverage of app.py
+
+## Result
+
+E2E test suite already existed - 75 tests across 8 files:
+- test_e2e_board_rendering.py (11 tests)
+- test_e2e_detail_panel.py (10 tests)
+- test_e2e_focus_switch.py (13 tests)
+- test_e2e_markdown_structure.py (11 tests)
+- test_e2e_move_mode.py (7 tests)
+- test_e2e_parent_display.py (9 tests)
+- test_e2e_scroll.py (8 tests)
+- test_e2e_search.py (8 tests)
+
+All 75 tests pass. Coverage targets met.
