@@ -124,6 +124,13 @@ class BoardApp(App):
                 if parent:
                     label_text = f"{label_text}  ↑{parent}"
                 prefix = "♦ " if mine(t, self._user) else "• "
+                ds = t["fm"].get("delegation_status")
+                if ds == "queued":
+                    prefix = "⏳ "
+                elif ds == "processing":
+                    prefix = "▶ "
+                elif ds == "done":
+                    prefix = "✓ "
                 matched = (
                     self.search_query
                     and (self.search_query.lower() in t["title"].lower()

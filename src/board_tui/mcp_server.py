@@ -10,6 +10,7 @@ from pathlib import Path
 from mcp.server.fastmcp import FastMCP
 
 from board_tui.tasks import dump, load_tasks, parse, slugify
+from board_tui.tasks import set_frontmatter_field
 
 # BOARD_TASKS_DIR is read at server startup — one server per board.
 _tasks_dir = Path(os.environ["BOARD_TASKS_DIR"])
@@ -220,3 +221,14 @@ def delete_task(slug: str) -> bool:
         return False
     path.unlink()
     return True
+
+
+@mcp.tool()
+def set_frontmatter(slug: str, key: str, value: str) -> dict | None:
+    """Set or update a single frontmatter field in a task card."""
+    path = _tasks_dir / f"{slug}.md"
+    if not path.exists():
+        return None
+    set_frontmatter_field(path, key, value)
+    fm, body = parse(path)
+    return {"slug": slug, "key": key, "value": value, "column": fm.get("column", "")}

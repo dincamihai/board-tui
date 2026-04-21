@@ -100,6 +100,13 @@ def strip_comments_section(body: str) -> str:
     return COMMENTS_RE.sub("", body).rstrip()
 
 
+def set_frontmatter_field(path: Path, key: str, value: str) -> None:
+    """Set or update a single frontmatter field in a task file."""
+    fm, body = parse(path)
+    fm[key] = value
+    dump(path, fm, body)
+
+
 def add_comment(path: Path, author: str, text: str, date: str) -> None:
     """Add a comment to a task file.
 
