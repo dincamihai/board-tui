@@ -18,4 +18,8 @@ board-tui = "board_tui.cli:main"
 board-tui-mcp = "board_tui.mcp_entry:main"
 
 [project.optional-dependencies]
-dev = ["pytest"]
+dev = ["pytest", "pytest-asyncio"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"

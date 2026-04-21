@@ -4,6 +4,8 @@ import re
 from pathlib import Path
 
 FRONTMATTER_RE = re.compile(r"^---\n(.*?)\n---\n(.*)$", re.DOTALL)
+COMMENTS_RE = re.compile(r"\n## Comments\n(.*?)(?=\n## |\Z)", re.DOTALL)
+COMMENT_ITEM_RE = re.compile(r"^- \*\*([^@]+) @([^:]+)\*\*: (.+)$", re.MULTILINE)
 
 
 def slugify(s: str) -> str:
@@ -66,3 +68,60 @@ def mine(task: dict, user: str) -> bool:
         task["fm"].get("assigned", "").lower() == user.lower()
         or task["title"].startswith("[human]")
     )
+
+
+def extract_comments(body: str) -> list[dict]:
+    """Extract comments from task body.
+
+    Returns list of {date, author, text} dicts.
+    Strips Comments section from body for separate rendering.
+    """
+    match = COMMENTS_RE.search(body)
+    if not match:
+        return []
+
+    comments_text = match.group(1)
+    comments = []
+
+    for line in comments_text.strip().split("\n"):
+        m = COMMENT_ITEM_RE.match(line.strip())
+        if m:
+            comments.append({
+                "date": m.group(1).strip(),
+                "author": m.group(2).strip(),
+                "text": m.group(3).strip(),
+            })
+
+    return comments
+
+
+def strip_comments_section(body: str) -> str:
+    """Remove Comments section from body for clean display."""
+    return COMMENTS_RE.sub("", body).rstrip()
+
+
+def add_comment(path: Path, author: str, text: str, date: str) -> None:
+    """Add a comment to a task file.
+
+    Creates Comments section if missing, otherwise appends.
+    """
+    fm, body = parse(path)
+    comments = extract_comments(body)
+    body_without_comments = strip_comments_section(body)
+
+    comment_line = f"- **{date} @{author}**: {text}\n"
+
+    if comments:
+        # Append to existing Comments section
+        match = COMMENTS_RE.search(body)
+        if match:
+            new_comments = body_without_comments + "\n\n## Comments\n"
+            for c in comments:
+                new_comments += f"- **{c['date']} @{c['author']}**: {c['text']}\n"
+            new_comments += comment_line
+            body = new_comments
+    else:
+        # Create new Comments section
+        body = body_without_comments + "\n\n## Comments\n" + comment_line
+
+    dump(path, fm, body)
