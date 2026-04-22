@@ -74,6 +74,7 @@ class BoardApp(App):
         Binding("m", "toggle_move", "move"),
         Binding("enter", "toggle_move", "move"),
         Binding("r", "refresh", "refresh"),
+        Binding("d", "delegate_task", "delegate"),
     ]
 
     move_mode = reactive(False)
@@ -241,6 +242,21 @@ class BoardApp(App):
     def action_refresh(self):
         self._reload()
         self.notify("refreshed")
+
+    def action_delegate_task(self):
+        if self.focus_side != "board":
+            return
+        sel = self._selected()
+        if not sel:
+            return
+        col = sel["column"]
+        if col not in ("Backlog", "In Progress"):
+            self.notify(f"cannot delegate from {col}")
+            return
+        sel["fm"]["delegation_status"] = "queued"
+        dump(sel["path"], sel["fm"], sel["body"])
+        self._reload()
+        self.notify(f"delegated {sel['slug']}")
 
     def action_escape(self):
         if self.move_mode:
