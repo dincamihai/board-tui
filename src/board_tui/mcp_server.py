@@ -232,3 +232,29 @@ def set_frontmatter(slug: str, key: str, value: str) -> dict | None:
     set_frontmatter_field(path, key, value)
     fm, body = parse(path)
     return {"slug": slug, "key": key, "value": value, "column": fm.get("column", "")}
+
+
+@mcp.tool()
+def list_delegated_tasks(status: str | None = None) -> list[dict]:
+    """Return tasks with delegation_status frontmatter.
+
+    When *status* is set, filter by that status (queued/processing/done/failed/cancelled).
+    Otherwise return all tasks that have any delegation_status.
+    """
+    tasks = load_tasks(_tasks_dir, DEFAULT_COLUMNS)
+    out = []
+    for t in tasks:
+        ds = t["fm"].get("delegation_status")
+        if ds is None:
+            continue
+        if status and ds != status:
+            continue
+        out.append({
+            "slug": t["slug"],
+            "title": t["title"],
+            "column": t["column"],
+            "order": t["order"],
+            "delegation_status": ds,
+            "body": t["body"],
+        })
+    return out
