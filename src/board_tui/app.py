@@ -75,6 +75,7 @@ class BoardApp(App):
         Binding("enter", "toggle_move", "move"),
         Binding("r", "refresh", "refresh"),
         Binding("d", "delegate_task", "delegate"),
+        Binding("D", "cancel_delegation", "cancel delegation"),
     ]
 
     move_mode = reactive(False)
@@ -257,6 +258,20 @@ class BoardApp(App):
         dump(sel["path"], sel["fm"], sel["body"])
         self._reload()
         self.notify(f"delegated {sel['slug']}")
+
+    def action_cancel_delegation(self):
+        if self.focus_side != "board":
+            return
+        sel = self._selected()
+        if not sel:
+            return
+        ds = sel["fm"].get("delegation_status")
+        if ds not in ("queued", "processing"):
+            return
+        sel["fm"]["delegation_status"] = "cancelled"
+        dump(sel["path"], sel["fm"], sel["body"])
+        self._reload()
+        self.notify(f"cancelled {sel['slug']}")
 
     def action_escape(self):
         if self.move_mode:
