@@ -75,8 +75,6 @@ class BoardApp(App):
         Binding("m", "toggle_move", "move"),
         Binding("enter", "toggle_move", "move"),
         Binding("r", "refresh", "refresh"),
-        Binding("d", "delegate_task", "delegate"),
-        Binding("D", "cancel_delegation", "cancel delegation"),
         Binding("space", "toggle_collapse", "collapse/expand"),
     ]
 
@@ -178,13 +176,6 @@ class BoardApp(App):
                 is_orphan = parent and parent not in all_slugs
 
                 prefix = "♦ " if mine(t, self._user) else "• "
-                ds = t["fm"].get("delegation_status")
-                if ds == "queued":
-                    prefix = "⏳ "
-                elif ds == "processing":
-                    prefix = "▶ "
-                elif ds == "done":
-                    prefix = "✓ "
 
                 indent = 0
                 classes = []
@@ -342,35 +333,6 @@ class BoardApp(App):
     def action_refresh(self):
         self._reload()
         self.notify("refreshed")
-
-    def action_delegate_task(self):
-        if self.focus_side != "board":
-            return
-        sel = self._selected()
-        if not sel:
-            return
-        col = sel["column"]
-        if col not in ("Backlog", "In Progress"):
-            self.notify(f"cannot delegate from {col}")
-            return
-        sel["fm"]["delegation_status"] = "queued"
-        dump(sel["path"], sel["fm"], sel["body"])
-        self._reload()
-        self.notify(f"delegated {sel['slug']}")
-
-    def action_cancel_delegation(self):
-        if self.focus_side != "board":
-            return
-        sel = self._selected()
-        if not sel:
-            return
-        ds = sel["fm"].get("delegation_status")
-        if ds not in ("queued", "processing"):
-            return
-        sel["fm"]["delegation_status"] = "cancelled"
-        dump(sel["path"], sel["fm"], sel["body"])
-        self._reload()
-        self.notify(f"cancelled {sel['slug']}")
 
     def action_escape(self):
         if self.move_mode:
