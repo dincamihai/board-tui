@@ -1,9 +1,6 @@
 ---
-column: Backlog
----
-
----
 column: Done
+updated: true
 ---
 
 # board-tui: delegation e2e tests

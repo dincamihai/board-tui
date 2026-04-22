@@ -1,5 +1,6 @@
 ---
 column: Done
+updated: true
 ---
 
 # Subtask support: parent field + list_tasks(parent=) filter

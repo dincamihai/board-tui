@@ -1,5 +1,6 @@
 ---
 column: Done
+updated: true
 ---
 
 # Distribute task-cards and delegate skills to board-tui/skills/
