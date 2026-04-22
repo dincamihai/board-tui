@@ -14,7 +14,7 @@ from board_tui.tasks import dump, load_tasks, parse, slugify
 from board_tui.tasks import set_frontmatter_field
 
 # BOARD_TASKS_DIR is read at server startup — one server per board.
-_tasks_dir = Path(os.environ["BOARD_TASKS_DIR"])
+_tasks_dir = Path(os.environ.get("BOARD_TASKS_DIR", os.path.join(os.getcwd(), ".tasks")))
 DEFAULT_COLUMNS = ["Backlog", "In Progress", "Done"]
 
 # Columns to exclude from default list_tasks calls (archived / closed states)

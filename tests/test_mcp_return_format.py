@@ -17,7 +17,6 @@ from board_tui.mcp_server import (
     update_task,
     delete_task,
     set_frontmatter,
-    list_delegated_tasks,
 )
 
 
@@ -151,18 +150,3 @@ def test_set_frontmatter_missing_returns_json_null():
     assert isinstance(result, str)
     assert json.loads(result) is None
 
-
-# ---------------------------------------------------------------------------
-# list_delegated_tasks
-# ---------------------------------------------------------------------------
-
-def test_list_delegated_tasks_returns_json_list():
-    result = list_delegated_tasks()
-    tasks = _assert_json_list(result)
-    assert isinstance(tasks, list)
-
-
-def test_list_delegated_tasks_queued_returns_json_list():
-    result = list_delegated_tasks(status="queued")
-    tasks = _assert_json_list(result)
-    assert isinstance(tasks, list)

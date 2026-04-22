@@ -16,6 +16,8 @@ def main() -> None:
 
     if args.tasks_dir:
         os.environ["BOARD_TASKS_DIR"] = args.tasks_dir
+    elif "BOARD_TASKS_DIR" not in os.environ:
+        os.environ["BOARD_TASKS_DIR"] = os.path.join(os.getcwd(), ".tasks")
 
     from board_tui.mcp_server import mcp
     mcp.run()
