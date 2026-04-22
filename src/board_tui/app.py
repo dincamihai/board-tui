@@ -156,6 +156,13 @@ class BoardApp(App):
 
             self.by_col[col] = ordered
 
+        def _restore_col_index(lv, prev_idx, col_name):
+            n = len(self.by_col.get(col_name, []))
+            if prev_idx < n:
+                lv.index = prev_idx
+            else:
+                lv.index = max(0, n - 1)
+
         for col in self._columns:
             lv = self.query_one(f"#list-{slugify(col)}", ListView)
             prev_idx = lv.index or 0
@@ -214,12 +221,12 @@ class BoardApp(App):
                 item.data = t
                 lv.append(item)
 
-            if prev_idx < len(self.by_col[col]):
-                lv.index = prev_idx
-            else:
-                lv.index = max(0, len(self.by_col[col]) - 1)
+            self.call_after_refresh(_restore_col_index, lv, prev_idx, col)
         self._update_titles()
         self._update_detail()
+        if self.focus_side == "board":
+            col = self._columns[self.cur_col]
+            self.query_one(f"#list-{slugify(col)}", ListView).focus()
 
     def _update_titles(self):
         for i, col in enumerate(self._columns):
