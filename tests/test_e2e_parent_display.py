@@ -149,6 +149,15 @@ async def test_parent_slug_displayed_after_title(tmp_path: Path):
     tasks_dir.mkdir()
 
     _write_tasks(tasks_dir, [
+        ("feat-auth", """---
+column: In Progress
+order: 1
+created: 2026-04-21
+---
+
+# Feat auth
+
+Parent."""),
         ("login-auth", _TASK_WITH_PARENT_SHORT_SLUG_MD),
     ])
 
@@ -252,6 +261,15 @@ async def test_parent_with_other_frontmatter_fields(tmp_path: Path):
     tasks_dir.mkdir()
 
     _write_tasks(tasks_dir, [
+        ("feature-x", """---
+column: In Progress
+order: 1
+created: 2026-04-21
+---
+
+# Feature X
+
+Parent."""),
         ("multi-fields", _TASK_MULTIPLE_FIELDS_MD),
     ])
 

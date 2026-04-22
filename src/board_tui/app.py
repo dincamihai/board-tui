@@ -54,6 +54,7 @@ class BoardApp(App):
     ListItem { padding: 0 1; }
     ListItem.mine { color: cyan; text-style: dim; }
     ListItem.matched { text-style: bold; }
+    ListItem.indent-1 { padding-left: 2; }
     #detail { width: 40%; padding: 0 1; border-left: solid $primary-darken-2; }
     #detail-header { text-style: bold reverse; padding: 0 1; }
     #detail-scroll { height: 1fr; }
@@ -76,6 +77,7 @@ class BoardApp(App):
         Binding("r", "refresh", "refresh"),
         Binding("d", "delegate_task", "delegate"),
         Binding("D", "cancel_delegation", "cancel delegation"),
+        Binding("space", "toggle_collapse", "collapse/expand"),
     ]
 
     move_mode = reactive(False)
@@ -92,6 +94,7 @@ class BoardApp(App):
         self.by_col = {c: [] for c in self._columns}
         self.search_matches = []
         self.search_pos = 0
+        self._collapsed_parents: set[str] = set()
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=False)
@@ -113,18 +116,60 @@ class BoardApp(App):
 
     def _reload(self):
         self.tasks = load_tasks(self._tasks_dir, self._columns)
+        all_slugs = {t["slug"] for t in self.tasks}
         self.by_col = {c: [] for c in self._columns}
         for t in self.tasks:
             self.by_col.setdefault(t["column"], []).append(t)
+
+        # Per-column: compute children from flat list, reorder, render
+        self._children_by_col = {}
+        for col in self._columns:
+            flat_tasks = self.by_col[col]
+            # Map parent slug -> children in this column (from flat list)
+            children_by_parent: dict[str, list] = {}
+            for t in flat_tasks:
+                parent = t["fm"].get("parent")
+                if parent and parent in all_slugs and any(p["slug"] == parent for p in flat_tasks):
+                    children_by_parent.setdefault(parent, []).append(t)
+            self._children_by_col[col] = children_by_parent
+
+            # Reorder: parent, visible children (recursive), standalone
+            ordered = []
+            used = set()
+
+            def add_with_children(task):
+                if task["slug"] in used:
+                    return
+                ordered.append(task)
+                used.add(task["slug"])
+                if task["slug"] not in self._collapsed_parents:
+                    for child in children_by_parent.get(task["slug"], []):
+                        add_with_children(child)
+
+            for t in flat_tasks:
+                if t["slug"] in used:
+                    continue
+                parent = t["fm"].get("parent")
+                if parent and parent in all_slugs and any(p["slug"] == parent for p in flat_tasks):
+                    continue
+                add_with_children(t)
+
+            self.by_col[col] = ordered
+
         for col in self._columns:
             lv = self.query_one(f"#list-{slugify(col)}", ListView)
             prev_idx = lv.index or 0
             lv.clear()
-            for t in self.by_col[col]:
+            col_tasks = self.by_col[col]
+            children_by_parent = self._children_by_col.get(col, {})
+
+            for t in col_tasks:
                 label_text = t["title"]
                 parent = t["fm"].get("parent")
-                if parent:
-                    label_text = f"{label_text}  ↑{parent}"
+                is_parent = t["slug"] in children_by_parent
+                is_child = parent and parent in all_slugs and any(p["slug"] == parent for p in col_tasks)
+                is_orphan = parent and parent not in all_slugs
+
                 prefix = "♦ " if mine(t, self._user) else "• "
                 ds = t["fm"].get("delegation_status")
                 if ds == "queued":
@@ -133,20 +178,42 @@ class BoardApp(App):
                     prefix = "▶ "
                 elif ds == "done":
                     prefix = "✓ "
+
+                indent = 0
+                classes = []
+
+                if is_orphan:
+                    prefix = "! " + prefix
+                    label_text = f"{label_text}  ↑{parent}"
+                elif is_child:
+                    indent = 1
+                    classes.append("indent-1")
+                elif parent and not is_child:
+                    label_text = f"{label_text}  ↑{parent}"
+
+                if is_parent:
+                    count = len(children_by_parent.get(t["slug"], []))
+                    collapsed = t["slug"] in self._collapsed_parents
+                    indicator = "▸" if collapsed else "▾"
+                    label_text = f"{indicator}{count} {label_text}"
+
                 matched = (
                     self.search_query
                     and (self.search_query.lower() in t["title"].lower()
                          or self.search_query.lower() in t["slug"].lower())
                 )
-                classes = []
                 if mine(t, self._user):
                     classes.append("mine")
                 if matched:
                     classes.append("matched")
+                if is_orphan:
+                    classes.append("orphan")
+
                 item = ListItem(Label(prefix + label_text),
                                 classes=" ".join(classes) if classes else "")
                 item.data = t
                 lv.append(item)
+
             if prev_idx < len(self.by_col[col]):
                 lv.index = prev_idx
             else:
@@ -179,10 +246,19 @@ class BoardApp(App):
         if not sel:
             body.update("_no selection_")
             return
+        all_slugs = {t["slug"] for t in self.tasks}
         md = [f"### {sel['title']}", "", f"`{sel['slug']}` · _{sel['column']}_"]
         for k, v in sel["fm"].items():
             if k == "column":
                 continue
+            if k == "parent":
+                parent_slug = v
+                if parent_slug not in all_slugs:
+                    md.append(f"- **{k}**: {v} ⚠️ _(not found)_")
+                    md.append("")
+                    md.append(f"> This task references parent `{parent_slug}` which does not exist.")
+                    md.append("> Consider updating the `parent` frontmatter or creating the parent task.")
+                    continue
             md.append(f"- **{k}**: {v}")
         md.append("")
         md.append(sel["body"])
@@ -223,6 +299,22 @@ class BoardApp(App):
             return
         self.move_mode = not self.move_mode
         self._update_detail()
+
+    def action_toggle_collapse(self):
+        if self.focus_side != "board":
+            return
+        sel = self._selected()
+        if not sel:
+            return
+        col = self._columns[self.cur_col]
+        children_by_parent = self._children_by_col.get(col, {})
+        if sel["slug"] not in children_by_parent:
+            return
+        if sel["slug"] in self._collapsed_parents:
+            self._collapsed_parents.remove(sel["slug"])
+        else:
+            self._collapsed_parents.add(sel["slug"])
+        self._reload()
 
     _clipboard_cmd = ["pbcopy"] if platform.system() == "Darwin" else ["xclip", "-selection", "clipboard"]
 

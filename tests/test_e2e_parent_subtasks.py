@@ -2,7 +2,7 @@
 
 import pytest
 from pathlib import Path
-from textual.widgets import Label, ListView
+from textual.widgets import Label, ListView, Markdown
 
 from board_tui.app import BoardApp
 
@@ -78,12 +78,12 @@ _SUBTASK_IP_MD = """---
 column: In Progress
 order: 6
 created: 2026-04-22
-parent: in-progress-parent
+parent: parent-feature
 ---
 
 # IP subtask
 
-Under in-progress parent."""
+Under parent-feature in different column."""
 
 
 def _write_tasks(tasks_dir: Path, entries: list[tuple[str, str]]) -> None:
@@ -105,15 +105,17 @@ def _get_list_items(lv: ListView) -> list[dict]:
     for child in lv.children:
         if hasattr(child, "children") and child.children:
             label = child.children[0]
-            text = label.content if hasattr(label, "content") else str(label.renderable)
-            classes = child.classes if hasattr(child, "classes") else ""
+            text = str(label.content) if hasattr(label, "content") else str(label)
+            raw_classes = child.classes if hasattr(child, "classes") else ""
+            # classes may be frozenset or space-separated string
+            class_list = list(raw_classes) if isinstance(raw_classes, frozenset) else str(raw_classes).split()
             # Indent class like "indent-1" tells us nesting level
             indent = 0
-            for c in classes.split():
+            for c in class_list:
                 if c.startswith("indent-"):
                     indent = int(c.split("-")[1])
                     break
-            out.append({"text": text, "classes": classes, "indent": indent})
+            out.append({"text": text, "classes": " ".join(class_list), "indent": indent})
     return out
 
 
@@ -371,12 +373,12 @@ async def test_counter_updates_when_subtask_moved(tmp_path: Path):
         await pilot.press("enter")
         await pilot.pause()
 
-        # Backlog parent now shows 0 subtasks
+        # Backlog parent has no children in this column — no indicator
         items = _get_list_items(bg_lv)
         assert len(items) == 1
         parent_text = items[0]["text"]
-        assert "▸0" in parent_text or "▾0" in parent_text, (
-            f"Parent counter should show 0 after move: {parent_text}"
+        assert "▾" not in parent_text and "▸" not in parent_text, (
+            f"Parent with no children in column should not show indicator: {parent_text}"
         )
 
 
@@ -410,4 +412,53 @@ Nested under subtask."""
         items = _get_list_items(bg_lv)
         # parent (0) → subtask-a (1) → grandchild (1, not 2)
         assert items[2]["indent"] == 1, "grandchild indent capped at 1"
-        assert "↑subtask-a" in items[2]["text"]
+        assert "Grandchild" in items[2]["text"]
+
+
+async def test_expand_collapse_expand_cycle_keeps_highlight_and_state(tmp_path: Path):
+    """Parent stays highlighted after expand > collapse > expand cycle."""
+    tasks_dir = tmp_path / ".tasks"
+    tasks_dir.mkdir()
+
+    _write_tasks(tasks_dir, [
+        ("parent-feature", _PARENT_TASK_MD),
+        ("subtask-a", _SUBTASK_A_MD),
+        ("subtask-b", _SUBTASK_B_MD),
+    ])
+
+    app = _make_app(tasks_dir)
+    async with app.run_test(size=(160, 40)) as pilot:
+        await pilot.pause()
+
+        bg_lv = app.query_one("#list-backlog", ListView)
+
+        # Initially expanded, parent highlighted
+        assert bg_lv.index == 0
+        assert app._selected()["slug"] == "parent-feature"
+        items = _get_list_items(bg_lv)
+        assert len(items) == 3
+        assert "▾2" in items[0]["text"] or "▾" in items[0]["text"]
+
+        # Collapse
+        await pilot.press("space")
+        await pilot.pause()
+
+        # Parent still highlighted at index 0
+        assert bg_lv.index == 0
+        assert app._selected()["slug"] == "parent-feature"
+        items = _get_list_items(bg_lv)
+        assert len(items) == 1
+        assert "▸2" in items[0]["text"] or "▸" in items[0]["text"]
+
+        # Expand again
+        await pilot.press("space")
+        await pilot.pause()
+
+        # Parent still highlighted, subtasks visible again
+        assert bg_lv.index == 0
+        assert app._selected()["slug"] == "parent-feature"
+        items = _get_list_items(bg_lv)
+        assert len(items) == 3
+        assert "▾2" in items[0]["text"] or "▾" in items[0]["text"]
+        assert "Subtask A" in items[1]["text"]
+        assert "Subtask B" in items[2]["text"]
