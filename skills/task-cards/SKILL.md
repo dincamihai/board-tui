@@ -10,71 +10,96 @@ description: >
 
 # Task Cards
 
-Each repo tracks its own work in a `.tasks/` directory at the repo root. Cards are small, self-contained units of work — one clear outcome per card.
+Each repo tracks its own work in a `.tasks/` directory at the repo root. Cards are small, self-contained units of work — one clear outcome per card. Rendered by the `board-tui` kanban tool (`~/Repos/board-tui`).
 
 ## Card format
 
 ```markdown
 ---
 column: Backlog
-created: YYYY-MM-DD
-order: N
+created: 2026-04-23
+order: 10
 ---
 
-# <repo>: <short title>
+# <short title>
 
-<What needs to be done and why. Include enough context for someone (or an agent) to complete the task without asking questions.>
-
-## Result
+<What needs to be done and why. Self-contained context. Concrete
+file paths, line numbers, code sketches where relevant.>
 ```
 
-- `column`: `Backlog` | `In Progress` | `Done`
-- `order`: integer, lower = higher priority within a column
-- `## Result` section: empty until task completes — agent or human fills it in
+### Frontmatter — what `board-tui` reads
+
+| Key | Required | Purpose |
+|---|---|---|
+| `column` | yes | `Backlog` \| `In Progress` \| `Done` (default columns; overridable via `--columns`) |
+| `order` | recommended | integer; lower = higher priority within a column; default 1000 if missing |
+| `parent` | optional | slug of another card → renders as subtask under parent (collapsible) |
+| `assigned` | optional | username; used by `mine()` to filter "my cards" |
+| `created` | optional | free-form text; tool does not parse — use `YYYY-MM-DD` for readability |
+
+Any other frontmatter keys pass through unparsed. Add custom fields (e.g. `priority`, `estimate`) freely — tool ignores them.
+
+### Body
+
+- **Title**: first `# ` heading in the body. Becomes the card label.
+- **Free markdown** under the title. No required sections.
+- **`## Comments`** (optional): section with lines in format `- **YYYY-MM-DD @author**: text` — parsed by `add_comment()` / `extract_comments()` helpers.
+- **`## Result`** (convention, not enforced): some repos use it; tool does not parse. Fill in when moving to Done if the repo convention uses it.
 
 ## Slug naming
 
-`<repo-name>-<kebab-description>.md`
+`<prefix>-<kebab-description>.md`
 
-Examples: `board-tui-fix-cli-tests.md`, `local-agent-auto-worktree.md`
+Prefix should group related cards. Common patterns:
+- `<repo-name>-...` for general work: `board-tui-fix-cli-tests.md`
+- `<adr-id>-p<N>-...` for ADR phases: `adr-022-p2a-atomize-summarize-prompt-ga.md`
+- `human-...` for human-only tasks: `human-triage-931-null-category-concepts.md`
 
 ## Creating a card
 
 1. Pick the right repo — card lives where the work lives
-2. Keep scope small: one outcome, a few files at most
-3. Write enough context that the card is self-contained (no need to ask follow-up questions)
-4. Set `column: Backlog`, `created: <today>`, assign `order` (check existing cards for next available number)
-5. Leave `## Result` empty
+2. Keep scope small: one outcome, few files
+3. Self-contained body: file paths, line numbers, code sketches, gate criteria
+4. Set `column: Backlog`, `order: <N>` (scan siblings for next number — lower = higher priority)
+5. Optional: `parent: <slug>` for subtasks, `assigned: <user>`
 
 ## Moving a card
 
 - **Starting work**: set `column: In Progress`
-- **Delegating to agent**: set `column: In Progress` before calling `pi_start`
-- **Done**: set `column: Done`, fill in `## Result` with what was done
+- **Delegating to agent**: set `column: In Progress` before handoff
+- **Done**: set `column: Done`; if the repo convention uses `## Result`, fill it in with what shipped
 
 ## Checking tasks
 
-Tasks are spread across repos. To find all cards in the workspace:
+Find all cards in the workspace:
 ```bash
-find ~/repos -name "*.md" -path "*/.tasks/*" | sort
+find ~/Repos -name "*.md" -path "*/.tasks/*" | sort
 ```
 
-To see a single repo's board, the `board-tui` CLI renders them as a kanban board:
+Render a single repo's board:
 ```bash
 board-tui --tasks-dir <repo>/.tasks/
+# Or run from inside a repo; defaults to $PWD/.tasks
 ```
 
+Environment override: `BOARD_TASKS_DIR`.
+
 When the user asks "what's pending" or "what should we work on", scan all repos.
+
+## Subtask hierarchy
+
+A card with `parent: <slug>` renders indented under its parent in the same column. Parent is collapsible. Use subtasks to break a large phase into small cards without losing the grouping. Orphan children (parent slug not found) render with a marker.
 
 ## What makes a good card
 
 - **Small**: completable in one agent session or one focused work block
-- **Self-contained**: all context needed is in the card body
+- **Self-contained**: all context in the card body — no "ask user for clarification"
 - **One outcome**: clear definition of done
-- **Concrete**: says exactly what to change, not just "improve X"
+- **Concrete**: exact files, lines, and changes; not "improve X"
+- **Gate**: explicit pass/fail criteria when relevant
 
-If a task is too big, split it into smaller cards, add them to Backlog with appropriate `order` values, and delete the oversized card.
+Split oversized tasks into smaller cards, order them, delete the parent.
 
 ## Cross-repo work
 
-Each repo manages its own `.tasks/`. When work spans repos, create one card per repo. Link them by mentioning the sibling card slug in each card's body.
+Each repo manages its own `.tasks/`. For cross-repo work, create one card per repo. Cross-link via slug mentions in each body.
